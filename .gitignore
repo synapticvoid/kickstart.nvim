@@ -5,3 +5,8 @@ nvim
 
 spell/
 lazy-lock.json
+lazy/
+mason/
+.netrwhist
+*.log
+telescope_history
