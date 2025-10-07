@@ -893,6 +893,12 @@ require('lazy').setup({
       signature = { enabled = true },
     },
   },
+  { -- Supermaven
+    'supermaven-inc/supermaven-nvim',
+    config = function()
+      require('supermaven-nvim').setup {}
+    end,
+  },
 
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
