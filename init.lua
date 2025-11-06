@@ -893,13 +893,10 @@ require('lazy').setup({
       signature = { enabled = true },
     },
   },
-  { -- Supermaven
-    'supermaven-inc/supermaven-nvim',
-    config = function()
-      require('supermaven-nvim').setup {}
-    end,
+  { -- Codeium
+    'Exafunction/codeium.vim',
+    event = 'BufEnter',
   },
-
   { -- You can easily change to a different colorscheme.
     -- Change the name of the colorscheme plugin below, and then
     -- change the command in the config to whatever the name of that colorscheme is.
