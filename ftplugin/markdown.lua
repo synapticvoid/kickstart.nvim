@@ -5,16 +5,19 @@ vim.opt_local.wrap = true
 vim.opt_local.linebreak = true
 vim.opt_local.spell = true
 
+-- Better list formatting
+vim.opt_local.formatoptions:append 'n' -- Recognize numbered lists
+vim.opt_local.formatoptions:append 'r' -- Continue lists with <Enter>
+
+-- Treat hyphenated words as single words for navigation
+vim.opt_local.iskeyword:append '-'
+
+-- Comment string for markdown
+vim.opt_local.commentstring = '<!--%s-->'
+
 -- Keymaps for navigating wrapped lines (a good practice for Markdown)
 vim.keymap.set('n', 'j', 'gj', { buffer = true, desc = 'Move down visual line' })
 vim.keymap.set('n', 'k', 'gk', { buffer = true, desc = 'Move up visual line' })
-
--- Shortcut: <Leader>mn (Markdown New Slide)
--- Outputs: --- [new line] # <cursor>
-vim.keymap.set('n', '<Leader>mn', function()
-  -- o: Open new line, then write the sequence of lines and move the cursor
-  vim.cmd 'normal! o\n---\n\n# '
-end, { buffer = true, silent = true, desc = 'Create new generic slide' })
 
 -- Shortcut: <Leader>mn (Markdown New Slide)
 -- Goal: Place cursor at: # <cursor> (in Insert Mode)
@@ -25,7 +28,7 @@ vim.keymap.set('n', '<Leader>mn', function()
   vim.api.nvim_put(template, 'l', true, true)
 
   -- 'kA' moves up one line, then appends to the end of the line and starts Insert mode.
-  vim.cmd 'normal! kA'
+  vim.cmd 'normal! A'
 end, { buffer = true, silent = true, desc = 'Create new generic slide' })
 
 -- Shortcut: <Leader>mt (Markdown TP Slide)
@@ -45,3 +48,43 @@ vim.keymap.set('n', '<Leader>mt', function()
   vim.api.nvim_put(tp_template, 'l', true, true)
   vim.cmd 'startinsert'
 end, { buffer = true, silent = true, desc = 'Create new TP-layout slide' })
+
+-- Shortcut: <Leader>mc (Markdown Code block)
+-- Goal: Place cursor at: ```<cursor> with closing ``` below
+vim.keymap.set('n', '<Leader>mc', function()
+  local code_template = { '```', '```' }
+  vim.api.nvim_put(code_template, 'l', true, true)
+  -- Move up one line and append at the end (after the opening ```)
+  vim.cmd 'normal! kA'
+end, { buffer = true, silent = true, desc = 'Create code block' })
+
+-- Heading navigation (AZERTY-friendly)
+vim.keymap.set('n', '<Leader>mh', function()
+  vim.fn.search('^#\\+', 'W')
+end, { buffer = true, silent = true, desc = 'Next heading' })
+
+vim.keymap.set('n', '<Leader>mH', function()
+  vim.fn.search('^#\\+', 'bW')
+end, { buffer = true, silent = true, desc = 'Previous heading' })
+
+-- Shortcut: <Leader>mtb (Markdown Table)
+-- Goal: Insert basic table structure
+vim.keymap.set('n', '<Leader>mtb', function()
+  local table_template = {
+    '| Column 1 | Column 2 | Column 3 |',
+    '|----------|----------|----------|',
+    '|          |          |          |',
+  }
+  vim.api.nvim_put(table_template, 'l', true, true)
+  -- Move to first cell
+  vim.cmd 'normal! 2k$'
+end, { buffer = true, silent = true, desc = 'Create markdown table' })
+
+-- Shortcut: <Leader>mi (Markdown Image)
+-- Goal: Insert image syntax ![alt](path)
+vim.keymap.set('n', '<Leader>mi', function()
+  local image_template = { '![alt text](image-path)' }
+  vim.api.nvim_put(image_template, 'l', true, true)
+  -- Position cursor at 'alt text'
+  vim.cmd 'normal! k$F[la'
+end, { buffer = true, silent = true, desc = 'Insert image' })

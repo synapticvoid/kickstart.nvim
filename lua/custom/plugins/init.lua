@@ -11,7 +11,25 @@ return {
     'tadmccorkle/markdown.nvim',
     ft = 'markdown',
     config = function()
-      require('markdown').setup()
+      require('markdown').setup {
+        on_attach = function(bufnr)
+          local function toggle(key)
+            return "<Esc>gv<Cmd>lua require'markdown.inline'" .. ".toggle_emphasis_visual'" .. key .. "'<CR>"
+          end
+
+          vim.keymap.set('x', '<C-b>', toggle 'b', { buffer = bufnr })
+          vim.keymap.set('x', '<C-i>', toggle 'i', { buffer = bufnr })
+          vim.keymap.set('x', '<C-k>', toggle 'c', { buffer = bufnr })
+
+          -- Link management
+          vim.keymap.set('n', '<Leader>ma', '<Plug>(markdown_add_link)', { buffer = bufnr, desc = 'Markdown: Add link' })
+          vim.keymap.set('x', '<Leader>ma', '<Plug>(markdown_add_link)', { buffer = bufnr, desc = 'Markdown: Add link (visual)' })
+          vim.keymap.set('n', '<Leader>mo', '<Plug>(markdown_follow_link)', { buffer = bufnr, desc = 'Markdown: Open link' })
+
+          -- List management
+          vim.keymap.set('n', '<Leader>ml', '<Cmd>MDListItemBelow<CR>', { buffer = bufnr, desc = 'Markdown: Insert list item below' })
+        end,
+      }
 
       -- Define Lua functions to adjust heading level
       local function change_heading_level(direction)
@@ -69,6 +87,16 @@ return {
       filesystem = {
         follow_current_file = { enabled = true },
       },
+    },
+  },
+  { -- Lazygit integration
+    'kdheepak/lazygit.nvim',
+    cmd = 'LazyGit',
+    dependencies = {
+      'nvim-lua/plenary.nvim',
+    },
+    keys = {
+      { '<leader>gg', '<cmd>LazyGit<cr>', desc = '[G]it GUI' },
     },
   },
 }
