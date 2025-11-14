@@ -2,7 +2,8 @@
 -- Auto-save and cursor-synced preview
 
 -- Auto-save configuration
-vim.opt.updatetime = 200
+-- Note: updatetime override removed to avoid slowing down non-slide buffers
+-- vim.opt.updatetime = 200
 
 -- Auto-save on cursor hold for slide files
 vim.api.nvim_create_autocmd({"CursorHold", "CursorHoldI"}, {
@@ -16,6 +17,12 @@ local last_sync_time = 0
 local sync_cooldown = 500 -- milliseconds
 
 local function sync_slide_preview()
+  -- Early return for non-slide buffers to avoid jobstart overhead
+  local file_path = vim.fn.expand("%:p")
+  if not file_path:match("/slides/.*%.md$") then
+    return
+  end
+
   local current_time = vim.loop.now()
 
   -- Rate limiting: only sync once per cooldown period
@@ -25,8 +32,7 @@ local function sync_slide_preview()
 
   last_sync_time = current_time
 
-  -- Get current file and cursor position
-  local file_path = vim.fn.expand("%:p")
+  -- Get cursor position
   local line_num = vim.fn.line(".")
 
   -- Call the sync script
