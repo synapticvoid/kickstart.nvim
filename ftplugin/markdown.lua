@@ -27,8 +27,9 @@ vim.keymap.set('n', '<Leader>mn', function()
   -- 'l': line mode, true: after current line, true: allow text to be inserted
   vim.api.nvim_put(template, 'l', true, true)
 
-  -- 'kA' moves up one line, then appends to the end of the line and starts Insert mode.
-  vim.cmd 'normal! A'
+  -- Search for the '# ' line and position cursor after it
+  vim.cmd 'normal! /^# $\r$'
+  vim.cmd 'startinsert!'
 end, { buffer = true, silent = true, desc = 'Create new generic slide' })
 
 -- Shortcut: <Leader>mt (Markdown TP Slide)

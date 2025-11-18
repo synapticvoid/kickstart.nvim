@@ -6,7 +6,7 @@ M.config = {
   nvim_port = 8766,
   host = '127.0.0.1',
   debounce_ms = 400,
-  slides_dir_pattern = '/**/slides/',
+  slides_dir_pattern = '/slides/',
   plugin_dir = vim.fn.stdpath 'config' .. '/slidevim',
 }
 
@@ -196,18 +196,12 @@ local function detect_slides()
       local main_slides = parse_slides_from_lines(main_lines, true) -- Skip src: blocks
       local directives = extract_src_directives(main_lines)
 
-      vim.notify('[Slidevim Debug] Found ' .. #directives .. ' src directives in slides.md', vim.log.levels.INFO)
-
       -- Find where current file is included
       for _, directive in ipairs(directives) do
         -- Resolve relative path from slides.md location
         local src_path = vim.fn.fnamemodify(slides_dir .. '/' .. directive.path, ':p')
 
-        vim.notify('[Slidevim Debug] Comparing: ' .. src_path .. ' vs ' .. current_file, vim.log.levels.INFO)
-
         if src_path == current_file then
-          vim.notify('[Slidevim Debug] Found current file in directives', vim.log.levels.INFO)
-
           -- Count slides before this directive
           for _, slide_info in ipairs(main_slides) do
             if slide_info.line < directive.line then
@@ -220,20 +214,13 @@ local function detect_slides()
             if prev_directive.line < directive.line then
               local prev_path = vim.fn.fnamemodify(slides_dir .. '/' .. prev_directive.path, ':p')
               local prev_count = count_slides_in_file(prev_path)
-              vim.notify('[Slidevim Debug] Adding ' .. prev_count .. ' slides from ' .. prev_path, vim.log.levels.INFO)
               offset = offset + prev_count
             end
           end
 
-          -- Add 1 because the src: directive position itself becomes the first included slide
-          offset = offset + 1
-
-          vim.notify('[Slidevim Debug] Final offset: ' .. offset, vim.log.levels.INFO)
           break
         end
       end
-    else
-      vim.notify('[Slidevim Debug] Could not open main file: ' .. main_file, vim.log.levels.ERROR)
     end
 
     -- Apply offset to current file's slides

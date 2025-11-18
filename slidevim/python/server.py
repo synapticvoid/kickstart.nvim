@@ -24,11 +24,9 @@ nvim_server = None
 async def handle_websocket(websocket: WebSocketServerProtocol):
     """Handle a WebSocket client (Chrome) connection"""
     ws_clients.add(websocket)
-    print(f"[Slidevim] WebSocket client connected, total: {len(ws_clients)}", flush=True)
     
     try:
         async for message in websocket:
-            print(f"[Slidevim] WS received: {message}", flush=True)
             # Broadcast to Neovim clients (newline-delimited JSON)
             if nvim_clients:
                 for writer in nvim_clients:
@@ -38,14 +36,11 @@ async def handle_websocket(websocket: WebSocketServerProtocol):
         pass
     finally:
         ws_clients.discard(websocket)
-        print(f"[Slidevim] WebSocket client disconnected, total: {len(ws_clients)}", flush=True)
 
 
 async def handle_nvim_client(reader, writer):
     """Handle a Neovim TCP client connection"""
     nvim_clients.add(writer)
-    addr = writer.get_extra_info('peername')
-    print(f"[Slidevim] Neovim client connected from {addr}", flush=True)
     
     try:
         while True:
@@ -55,7 +50,6 @@ async def handle_nvim_client(reader, writer):
             
             message = data.decode().strip()
             if message:
-                print(f"[Slidevim] Nvim received: {message}", flush=True)
                 # Broadcast to WebSocket clients
                 if ws_clients:
                     await asyncio.gather(
@@ -63,12 +57,11 @@ async def handle_nvim_client(reader, writer):
                         return_exceptions=True
                     )
     except Exception as e:
-        print(f"[Slidevim] Nvim client error: {e}", flush=True)
+        print(f"[Slidevim] Error: {e}", flush=True)
     finally:
         nvim_clients.discard(writer)
         writer.close()
         await writer.wait_closed()
-        print(f"[Slidevim] Neovim client disconnected", flush=True)
 
 
 async def start_servers():
