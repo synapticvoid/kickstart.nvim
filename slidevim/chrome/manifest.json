@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Slidevim",
+  "version": "0.1.0",
+  "description": "Bidirectional sync between Neovim and sli.dev slides",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:*/*",
+        "http://127.0.0.1:*/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
