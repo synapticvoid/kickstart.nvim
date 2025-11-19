@@ -20,13 +20,15 @@ vim.opt_local.commentstring = '<!--%s-->'
 vim.keymap.set('n', 'j', 'gj', { buffer = true, desc = 'Move down visual line' })
 vim.keymap.set('n', 'k', 'gk', { buffer = true, desc = 'Move up visual line' })
 
--- Shortcut: <Leader>mc (Markdown Code block)
+-- Shortcut: <Leader>mb (Markdown Code block)
 -- Goal: Place cursor at: ```<cursor> with closing ``` below
-vim.keymap.set('n', '<Leader>mc', function()
+vim.keymap.set('n', '<Leader>mb', function()
+  local row = unpack(vim.api.nvim_win_get_cursor(0))
   local code_template = { '```', '```' }
   vim.api.nvim_put(code_template, 'l', true, true)
-  -- Move up one line and append at the end (after the opening ```)
-  vim.cmd 'normal! kA'
+  -- Move to the first inserted line
+  vim.api.nvim_win_set_cursor(0, { row + 1, 0 })
+  vim.cmd 'startinsert!'
 end, { buffer = true, silent = true, desc = 'Create code block' })
 
 -- Shortcut: <Leader>mtb (Markdown Table)
@@ -97,3 +99,89 @@ vim.keymap.set('n', '<Leader>mt', function()
   vim.api.nvim_put(tp_template, 'l', true, true)
   vim.cmd 'startinsert'
 end, { buffer = true, silent = true, desc = 'Create new TP-layout slide' })
+
+-- Shortcut: <Leader>mc (Markdown Center Content)
+-- Goal: Create center-content slide and edit title
+vim.keymap.set('n', '<Leader>mc', function()
+  local template = {
+    '',
+    '---',
+    'layout: center-content',
+    'title: ',
+    'subtitle: ',
+    '---',
+    '',
+  }
+  vim.api.nvim_put(template, 'l', true, true)
+
+  -- Search for the 'title: ' line and position cursor after it
+  vim.cmd 'normal! /^title: $\r$'
+  vim.cmd 'startinsert!'
+end, { buffer = true, silent = true, desc = 'Create center-content slide' })
+
+-- Shortcut: <Leader>mC (Markdown Center Title)
+-- Goal: Create center-title slide and edit title
+vim.keymap.set('n', '<Leader>mC', function()
+  local template = {
+    '',
+    '---',
+    'layout: center-title',
+    'title: ',
+    'subtitle: ',
+    '---',
+    '',
+  }
+  vim.api.nvim_put(template, 'l', true, true)
+
+  -- Search for the 'title: ' line and position cursor after it
+  vim.cmd 'normal! /^title: $\r$'
+  vim.cmd 'startinsert!'
+end, { buffer = true, silent = true, desc = 'Create center-title slide' })
+
+-- Shortcut: <Leader>mtt (Markdown Top Title)
+-- Goal: Create top-title slide and edit title
+vim.keymap.set('n', '<Leader>mtt', function()
+  local template = {
+    '',
+    '---',
+    'layout: top-title',
+    '---',
+    '',
+    ':: title ::',
+    '',
+    '# ',
+    '',
+    ':: content ::',
+    '',
+  }
+  vim.api.nvim_put(template, 'l', true, true)
+
+  -- Search for the '# ' line and position cursor after it
+  vim.cmd 'normal! /^# $\r$'
+  vim.cmd 'startinsert!'
+end, { buffer = true, silent = true, desc = 'Create top-title slide' })
+
+-- Shortcut: <Leader>ms (Markdown Side Title)
+-- Goal: Create side-title slide and edit title
+vim.keymap.set('n', '<Leader>ms', function()
+  local template = {
+    '',
+    '---',
+    'layout: side-title',
+    'align: rm-lm',
+    'color: amber',
+    '---',
+    '',
+    ':: title ::',
+    '',
+    '',
+    '',
+    ':: content ::',
+    '',
+  }
+  vim.api.nvim_put(template, 'l', true, true)
+
+  -- Search backwards for ':: title ::' and go down 2 lines
+  vim.cmd 'normal! ?^:: title ::$\rjj'
+  vim.cmd 'startinsert'
+end, { buffer = true, silent = true, desc = 'Create side-title slide' })
