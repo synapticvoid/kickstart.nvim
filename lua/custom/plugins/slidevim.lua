@@ -3,6 +3,6 @@ return {
   name = 'slidevim',
   ft = 'markdown',
   config = function()
-    require 'slidevim'
+    require('slidevim').config.autosave = true
   end,
 }

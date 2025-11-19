@@ -4,6 +4,7 @@
 vim.opt_local.wrap = true
 vim.opt_local.linebreak = true
 vim.opt_local.spell = true
+vim.opt.spelllang = { 'en', 'fr' }
 
 -- Better list formatting
 vim.opt_local.formatoptions:append 'n' -- Recognize numbered lists

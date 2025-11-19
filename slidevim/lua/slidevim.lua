@@ -6,6 +6,7 @@ M.config = {
   nvim_port = 8766,
   host = '127.0.0.1',
   debounce_ms = 400,
+  autosave = false,
   slides_dir_pattern = '/slides/',
   plugin_dir = vim.fn.stdpath 'config' .. '/slidevim',
 }
@@ -15,6 +16,7 @@ local server_job = nil
 local tcp_client = nil
 local slide_cache = nil
 local debounce_timer = nil
+local autosave_timer = nil
 local last_sent_slide = nil
 
 -- Check if current buffer is in slides directory
@@ -41,8 +43,8 @@ local function parse_slides_from_lines(lines, skip_src_directives)
   end
 
   local function has_frontmatter_directive(line)
-    -- Match YAML key:value or YAML comments (#...)
-    return line:match '^%s*[%w_%-]+%s*:' ~= nil or line:match '^%s*#' ~= nil
+    -- Match YAML key:value (headers #... are not YAML comments in this context)
+    return line:match '^%s*[%w_%-]+%s*:' ~= nil
   end
 
   local function is_src_directive(line)
@@ -73,37 +75,35 @@ local function parse_slides_from_lines(lines, skip_src_directives)
       local has_frontmatter = false
       local is_src_block = false
       local j = i + 1
+      local start_line = i + 1 -- Potential start of new slide
 
       -- Scan next few lines (skip blank lines) to detect frontmatter
-      while j <= n and j <= i + 30 do
-        local next_line = lines[j]
+      while j <= n and lines[j]:match '^%s*$' do
+        j = j + 1
+      end
 
-        -- Skip blank lines
-        if next_line:match '^%s*$' then
-          j = j + 1
-        -- Found frontmatter directive
-        elseif has_frontmatter_directive(next_line) then
-          has_frontmatter = true
-          if is_src_directive(next_line) then
-            is_src_block = true
-          end
-          j = j + 1
-        -- Found closing separator
-        elseif is_separator(next_line) then
-          if has_frontmatter then
+      -- Simplified: If first non-blank line is a directive, assume frontmatter block
+      if j <= n and has_frontmatter_directive(lines[j]) then
+        has_frontmatter = true
+        if is_src_directive(lines[j]) then
+          is_src_block = true
+        end
+        
+        -- Scan forward to find the closing separator
+        while j <= n do
+          if is_separator(lines[j]) then
             i = j -- Skip to closing separator
+            break
           end
-          break
-        -- Found content (not frontmatter)
-        else
-          break
+          j = j + 1
         end
       end
 
       -- Only add as slide if not a src: directive block (or if we're not skipping them)
       if not (skip_src_directives and is_src_block) then
         -- Create slide after this separator (which may be the closing --- if frontmatter)
-        table.insert(slides, { slide = #slides + 1, line = i + 1 })
+        -- FIX: Start the slide right after the OPENING separator so frontmatter is included
+        table.insert(slides, { slide = #slides + 1, line = start_line })
       end
     end
 
@@ -354,6 +354,27 @@ local function connect_tcp()
   end)
 end
 
+-- Autosave current buffer
+local function autosave_buffer()
+  if vim.bo.modified then
+    vim.cmd 'silent! update'
+  end
+end
+
+-- Debounced autosave
+local function schedule_autosave()
+  if not M.config.autosave then
+    return
+  end
+
+  if autosave_timer then
+    autosave_timer:stop()
+  end
+
+  autosave_timer = vim.loop.new_timer()
+  autosave_timer:start(M.config.debounce_ms, 0, vim.schedule_wrap(autosave_buffer))
+end
+
 -- Start Python WebSocket server with uv
 function M.start()
   if server_job then
@@ -420,6 +441,7 @@ function M.start()
     pattern = '*.md',
     callback = function()
       slide_cache = nil -- Invalidate cache
+      schedule_autosave()
     end,
   })
 end
@@ -439,6 +461,11 @@ function M.stop()
   if debounce_timer then
     debounce_timer:stop()
     debounce_timer = nil
+  end
+
+  if autosave_timer then
+    autosave_timer:stop()
+    autosave_timer = nil
   end
 
   vim.api.nvim_del_augroup_by_name 'Slidevim'
