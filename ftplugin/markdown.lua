@@ -78,7 +78,7 @@ vim.keymap.set('n', '<Leader>mn', function()
   vim.api.nvim_put(template, 'l', true, true)
 
   -- Search for the '# ' line and position cursor after it
-  vim.cmd 'normal! /^# $\r$'
+  vim.cmd 'normal! ?^# $\r$'
   vim.cmd 'startinsert!'
 end, { buffer = true, silent = true, desc = 'Create new generic slide' })
 
@@ -115,7 +115,7 @@ vim.keymap.set('n', '<Leader>mc', function()
   vim.api.nvim_put(template, 'l', true, true)
 
   -- Search for the 'title: ' line and position cursor after it
-  vim.cmd 'normal! /^title: $\r$'
+  vim.cmd 'normal! ?^title: $\r$'
   vim.cmd 'startinsert!'
 end, { buffer = true, silent = true, desc = 'Create center-content slide' })
 
@@ -134,7 +134,7 @@ vim.keymap.set('n', '<Leader>mC', function()
   vim.api.nvim_put(template, 'l', true, true)
 
   -- Search for the 'title: ' line and position cursor after it
-  vim.cmd 'normal! /^title: $\r$'
+  vim.cmd 'normal! ?^title: $\r$'
   vim.cmd 'startinsert!'
 end, { buffer = true, silent = true, desc = 'Create center-title slide' })
 
@@ -157,7 +157,7 @@ vim.keymap.set('n', '<Leader>mtt', function()
   vim.api.nvim_put(template, 'l', true, true)
 
   -- Search for the '# ' line and position cursor after it
-  vim.cmd 'normal! /^# $\r$'
+  vim.cmd 'normal! ?^# $\r$'
   vim.cmd 'startinsert!'
 end, { buffer = true, silent = true, desc = 'Create top-title slide' })
 
