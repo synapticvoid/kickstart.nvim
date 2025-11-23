@@ -1,6 +1,24 @@
 -- Colorscheme configurations
 return {
-  { -- Default colorscheme
+  { -- OneDark colorscheme
+    'navarasu/onedark.nvim',
+    priority = 1000,
+    config = function()
+      require('onedark').setup {
+        style = 'darker', -- darker, dark, cool, deep, warm, warmer, light
+        code_style = {
+          comments = 'none', -- Disable italics for comments
+          keywords = 'none',
+          functions = 'none',
+          strings = 'none',
+          variables = 'none',
+        },
+      }
+      -- require('onedark').load()
+    end,
+  },
+
+  { -- Tokyo Night colorscheme
     'folke/tokyonight.nvim',
     priority = 1000,
     config = function()
@@ -10,34 +28,20 @@ return {
           comments = { italic = false }, -- Disable italics in comments
         },
       }
-
-      -- Load the colorscheme here.
-      -- Like many other themes, this one has different styles, and you could load
-      -- any other, such as 'tokyonight-storm', 'tokyonight-moon', or 'tokyonight-day'.
-      vim.cmd.colorscheme 'tokyonight-night'
     end,
   },
 
-  -- Additional colorschemes similar to IntelliJ New Island Dark
+  -- Catppuccin colorscheme (default)
   {
     'catppuccin/nvim',
     name = 'catppuccin',
     priority = 1000,
-    opts = {
-      flavour = 'mocha', -- latte, frappe, macchiato, mocha
-      no_italic = true, -- Disable italics
-    },
-  },
-
-  {
-    'EdenEast/nightfox.nvim',
-    priority = 1000,
-    opts = {
-      options = {
-        styles = {
-          comments = 'NONE', -- Disable italic comments
-        },
-      },
-    },
+    config = function()
+      require('catppuccin').setup {
+        flavour = 'mocha', -- latte, frappe, macchiato, mocha
+        no_italic = true, -- Disable italics
+      }
+      vim.cmd.colorscheme 'catppuccin'
+    end,
   },
 }

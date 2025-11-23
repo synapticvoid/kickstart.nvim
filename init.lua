@@ -166,6 +166,18 @@ vim.o.scrolloff = 10
 -- See `:help 'confirm'`
 vim.o.confirm = true
 
+-- Indentation settings
+-- Use spaces instead of tabs
+vim.o.expandtab = true
+-- Number of spaces for each indentation level
+vim.o.shiftwidth = 2
+-- Number of spaces that a <Tab> in the file counts for
+vim.o.tabstop = 2
+-- Number of spaces for <Tab> key in insert mode
+vim.o.softtabstop = 2
+-- Copy indent from current line when starting a new line
+vim.o.smartindent = true
+
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
 
