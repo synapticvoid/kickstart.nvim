@@ -700,6 +700,8 @@ require('lazy').setup({
         -- ts_ls = {},
         --
 
+        zls = {}, -- Zig Language Server
+
         lua_ls = {
           -- cmd = { ... },
           -- filetypes = { ... },
@@ -784,6 +786,7 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
+        zig = { 'zigfmt' },
         -- Conform can also run multiple formatters sequentially
         -- python = { "isort", "black" },
         --
@@ -940,7 +943,7 @@ require('lazy').setup({
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
     opts = {
-      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'vue' },
+      ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc', 'vue', 'zig' },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
