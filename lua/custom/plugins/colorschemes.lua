@@ -1,6 +1,6 @@
 -- Colorscheme configurations
 return {
-  { -- Nightfox colorscheme (carbonfox variant)
+  { -- Nightfox colorscheme
     'EdenEast/nightfox.nvim',
     priority = 1000,
     config = function()
@@ -13,16 +13,6 @@ return {
           },
         },
       }
-      vim.cmd.colorscheme 'carbonfox'
-
-      vim.keymap.set('n', '<leader>tt', function()
-        local current = vim.g.colors_name
-        if current == 'carbonfox' then
-          vim.cmd.colorscheme 'dawnfox'
-        else
-          vim.cmd.colorscheme 'carbonfox'
-        end
-      end, { desc = '[T]oggle [T]heme' })
     end,
   },
 
@@ -51,24 +41,49 @@ return {
       ---@diagnostic disable-next-line: missing-fields
       require('tokyonight').setup {
         styles = {
-          comments = { italic = false }, -- Disable italics in comments
+          comments = { italic = false },
         },
       }
-      -- vim.cmd.colorscheme 'tokyonight-night'
     end,
   },
 
-  -- Catppuccin colorscheme (default)
+  -- Catppuccin colorscheme
   {
     'catppuccin/nvim',
     name = 'catppuccin',
     priority = 1000,
     config = function()
       require('catppuccin').setup {
-        flavour = 'macchiato', -- latte, frappe, macchiato, mocha
-        no_italic = true, -- Disable italics
+        no_italic = true,
       }
-      -- vim.cmd.colorscheme 'catppuccin'
+    end,
+  },
+
+  -- GitHub colorscheme
+  {
+    'projekt0n/github-nvim-theme',
+    name = 'github-theme',
+    priority = 1000,
+    config = function()
+      require('github-theme').setup {
+        options = {
+          styles = {
+            comments = 'NONE',
+            keywords = 'NONE',
+            functions = 'NONE',
+          },
+        },
+      }
+      vim.cmd.colorscheme 'github_dark_default'
+
+      vim.keymap.set('n', '<leader>tt', function()
+        local current = vim.g.colors_name
+        if current == 'github_dark_default' then
+          vim.cmd.colorscheme 'github_light'
+        else
+          vim.cmd.colorscheme 'github_dark_default'
+        end
+      end, { desc = '[T]oggle [T]heme' })
     end,
   },
 }
