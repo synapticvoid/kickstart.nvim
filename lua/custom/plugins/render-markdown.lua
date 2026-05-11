@@ -5,5 +5,16 @@ return {
   -- dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-tree/nvim-web-devicons' }, -- if you prefer nvim-web-devicons
   ---@module 'render-markdown'
   ---@type render.md.UserConfig
-  opts = {},
+  opts = {
+    -- Use plain Markdown markers instead of circled heading numbers for readability.
+    heading = {
+      icons = { '# ', '## ', '### ', '#### ', '##### ', '###### ' },
+    },
+
+    -- Keep markdown rendering for headings, checkboxes, code blocks, etc.
+    -- Rendered pipe tables look nice but make cell editing/navigation jumpy.
+    pipe_table = {
+      enabled = false,
+    },
+  },
 }
