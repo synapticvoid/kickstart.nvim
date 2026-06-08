@@ -11,10 +11,11 @@ return {
       icons = { '# ', '## ', '### ', '#### ', '##### ', '###### ' },
     },
 
-    -- Keep markdown rendering for headings, checkboxes, code blocks, etc.
-    -- Rendered pipe tables look nice but make cell editing/navigation jumpy.
+    -- Render tables in normal mode only so they look clean when reading
+    -- but revert to raw pipes in insert mode to avoid cursor jumping.
     pipe_table = {
-      enabled = false,
+      enabled = true,
     },
+    render_modes = { 'n', 'c' },
   },
 }
