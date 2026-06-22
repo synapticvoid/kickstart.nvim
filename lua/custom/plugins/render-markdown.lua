@@ -16,6 +16,6 @@ return {
     pipe_table = {
       enabled = true,
     },
-    render_modes = { 'n', 'c' },
+    render_modes = true,
   },
 }
