@@ -18,11 +18,37 @@ local slide_cache = nil
 local debounce_timer = nil
 local autosave_timer = nil
 local last_sent_slide = nil
+local last_slide_winid = nil
 
--- Check if current buffer is in slides directory
-local function is_slides_buffer()
-  local path = vim.fn.expand '%:p'
-  return path:find(M.config.slides_dir_pattern) ~= nil
+-- Check if a buffer is in the configured slides directory
+local function is_slides_buffer(bufnr)
+  local path
+  if bufnr then
+    path = vim.api.nvim_buf_get_name(bufnr)
+  else
+    path = vim.fn.expand '%:p'
+  end
+
+  return path ~= '' and path:find(M.config.slides_dir_pattern) ~= nil
+end
+
+local function remember_slide_window()
+  local winid = vim.api.nvim_get_current_win()
+  if is_slides_buffer(vim.api.nvim_win_get_buf(winid)) then
+    last_slide_winid = winid
+  end
+end
+
+local function find_slide_window()
+  if last_slide_winid and vim.api.nvim_win_is_valid(last_slide_winid) and is_slides_buffer(vim.api.nvim_win_get_buf(last_slide_winid)) then
+    return last_slide_winid
+  end
+
+  for _, winid in ipairs(vim.api.nvim_list_wins()) do
+    if is_slides_buffer(vim.api.nvim_win_get_buf(winid)) then
+      return winid
+    end
+  end
 end
 
 -- Parse markdown lines and return slide positions
@@ -235,6 +261,8 @@ end
 
 -- Get current slide number from cursor position
 local function get_current_slide()
+  remember_slide_window()
+
   if not slide_cache then
     slide_cache = detect_slides()
   end
@@ -254,19 +282,29 @@ end
 
 -- Jump cursor to start of slide
 local function goto_slide(slide_num)
-  if not slide_cache then
-    slide_cache = detect_slides()
+  local winid = find_slide_window()
+  if not winid then
+    return false
   end
 
-  for _, entry in ipairs(slide_cache) do
-    if entry.slide == slide_num then
-      vim.api.nvim_win_set_cursor(0, { entry.line, 0 })
-      vim.cmd 'normal! zz' -- Center screen
-      return true
+  return vim.api.nvim_win_call(winid, function()
+    remember_slide_window()
+
+    if not slide_cache then
+      slide_cache = detect_slides()
     end
-  end
 
-  return false
+    for _, entry in ipairs(slide_cache) do
+      if entry.slide == slide_num then
+        local line = math.min(entry.line, vim.api.nvim_buf_line_count(0))
+        vim.api.nvim_win_set_cursor(0, { line, 0 })
+        vim.cmd 'normal! zz' -- Center screen
+        return true
+      end
+    end
+
+    return false
+  end)
 end
 
 -- Send message to Python server via TCP
@@ -281,10 +319,12 @@ end
 
 -- Send current slide to Chrome
 local function send_current_slide()
-  if not is_slides_buffer() then
+  local bufnr = vim.api.nvim_get_current_buf()
+  if not is_slides_buffer(bufnr) then
     return
   end
 
+  remember_slide_window()
   local slide = get_current_slide()
   if slide ~= last_sent_slide then
     last_sent_slide = slide
@@ -295,6 +335,8 @@ end
 
 -- Debounced slide update on cursor move
 local function schedule_slide_update()
+  remember_slide_window()
+
   if debounce_timer then
     debounce_timer:stop()
   end
@@ -440,6 +482,7 @@ function M.start()
     group = group,
     pattern = '*.md',
     callback = function()
+      remember_slide_window()
       slide_cache = nil -- Invalidate cache
       schedule_autosave()
     end,
@@ -468,6 +511,10 @@ function M.stop()
     autosave_timer = nil
   end
 
+  slide_cache = nil
+  last_slide_winid = nil
+  last_sent_slide = nil
+
   vim.api.nvim_del_augroup_by_name 'Slidevim'
   vim.notify('Slidevim: Stopped', vim.log.levels.INFO)
 end
@@ -486,8 +533,12 @@ end, { nargs = 1 })
 vim.api.nvim_create_autocmd('BufEnter', {
   pattern = '*.md',
   callback = function()
-    if is_slides_buffer() and not server_job then
-      M.start()
+    local bufnr = vim.api.nvim_get_current_buf()
+    if is_slides_buffer(bufnr) then
+      remember_slide_window()
+      if not server_job then
+        M.start()
+      end
     end
   end,
 })
