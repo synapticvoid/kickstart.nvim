@@ -7,6 +7,7 @@ M.config = {
   host = '127.0.0.1',
   debounce_ms = 400,
   autosave = false,
+  auto_start = true,
   slides_dir_pattern = '/slides/',
   plugin_dir = vim.fn.stdpath 'config' .. '/slidevim',
 }
@@ -591,6 +592,10 @@ end, { nargs = 1 })
 vim.api.nvim_create_autocmd('BufEnter', {
   pattern = '*.md',
   callback = function()
+    if not M.config.auto_start then
+      return
+    end
+
     local bufnr = vim.api.nvim_get_current_buf()
     if is_slides_buffer(bufnr) then
       remember_slide_window()
@@ -600,5 +605,12 @@ vim.api.nvim_create_autocmd('BufEnter', {
     end
   end,
 })
+
+M._debug = {
+  parse_slides_from_lines = parse_slides_from_lines,
+  extract_src_directives = extract_src_directives,
+  count_slides_in_file = count_slides_in_file,
+  detect_slides = detect_slides,
+}
 
 return M
