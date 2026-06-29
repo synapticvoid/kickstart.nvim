@@ -55,20 +55,22 @@ for _, directive in ipairs(debug_api.extract_src_directives(vim.fn.readfile(main
   table.insert(files, normalize_src(directive.path))
 end
 
+local deck_index = debug_api.build_deck_index(deck_dir)
+
 local function detect_file(relative_path)
-  local path = deck_dir .. '/' .. relative_path
+  local path = vim.fn.fnamemodify(deck_dir .. '/' .. relative_path, ':p')
   if vim.fn.filereadable(path) == 0 then
     fail('missing imported file: ' .. relative_path)
   end
 
   vim.cmd('silent keepalt edit ' .. vim.fn.fnameescape(path))
-  return debug_api.detect_slides()
+  return debug_api.detect_slides(), path
 end
 
 local rows = {}
 local all_slides = {}
 for _, relative_path in ipairs(files) do
-  local slides = detect_file(relative_path)
+  local slides, path = detect_file(relative_path)
   if #slides == 0 then
     fail('no slides detected in ' .. relative_path)
   end
@@ -76,6 +78,7 @@ for _, relative_path in ipairs(files) do
   for _, slide in ipairs(slides) do
     table.insert(all_slides, {
       file = relative_path,
+      path = path,
       slide = slide.slide,
       line = slide.line,
     })
@@ -83,6 +86,7 @@ for _, relative_path in ipairs(files) do
 
   table.insert(rows, {
     file = relative_path,
+    path = path,
     first_slide = slides[1].slide,
     first_line = slides[1].line,
     count = #slides,
@@ -124,7 +128,7 @@ local expected_sample_deck = {
     last_slide = 5,
     slides = {
       { slide = 1, line = 5 },
-      { slide = 5, line = 15 },
+      { slide = 5, line = 22 },
     },
   },
   {
@@ -151,6 +155,17 @@ local expected_sample_deck = {
       { slide = 8, line = 18 },
     },
   },
+  {
+    file = 'pages/nested/appendix.md',
+    first_slide = 9,
+    first_line = 4,
+    count = 2,
+    last_slide = 10,
+    slides = {
+      { slide = 9, line = 4 },
+      { slide = 10, line = 10 },
+    },
+  },
 }
 
 local expected = nil
@@ -173,6 +188,35 @@ end)
 for i, slide in ipairs(all_slides) do
   if slide.slide ~= i then
     add_failure(string.format('global slide sequence mismatch at #%d: found slide=%d in %s:%d', i, slide.slide, slide.file, slide.line))
+  end
+end
+
+if #deck_index.slides ~= #all_slides then
+  add_failure(string.format('deck index expected %d total slides from detect_slides(), got %d', #all_slides, #deck_index.slides))
+end
+
+for i, slide in ipairs(all_slides) do
+  local indexed = deck_index.slides[i]
+  if not indexed then
+    add_failure(string.format('deck index missing global slide entry #%d for %s:%d', slide.slide, slide.file, slide.line))
+  elseif indexed.slide ~= slide.slide or indexed.file ~= slide.path or indexed.line ~= slide.line then
+    add_failure(string.format('deck index slide #%d expected %s:%d, got %s:%d', slide.slide, slide.file, slide.line, indexed.file, indexed.line))
+  end
+end
+
+for _, row in ipairs(rows) do
+  local indexed_slides = deck_index.by_file[row.path] or {}
+  if #indexed_slides ~= #row.slides then
+    add_failure(string.format('deck index %s expected %d file slides from detect_slides(), got %d', row.file, #row.slides, #indexed_slides))
+  end
+
+  for i, slide in ipairs(row.slides) do
+    local indexed = indexed_slides[i]
+    if not indexed then
+      add_failure(string.format('deck index missing %s slide entry #%d', row.file, i))
+    elseif indexed.slide ~= slide.slide or indexed.line ~= slide.line then
+      add_failure(string.format('deck index %s entry #%d expected slide=%d line=%d, got slide=%d line=%d', row.file, i, slide.slide, slide.line, indexed.slide, indexed.line))
+    end
   end
 end
 

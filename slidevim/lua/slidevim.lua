@@ -53,6 +53,41 @@ local function find_slide_window()
   end
 end
 
+local function find_window_for_file(filepath)
+  filepath = vim.fn.fnamemodify(filepath, ':p')
+
+  for _, winid in ipairs(vim.api.nvim_list_wins()) do
+    local bufnr = vim.api.nvim_win_get_buf(winid)
+    if vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ':p') == filepath then
+      return winid
+    end
+  end
+end
+
+local function deck_dir_for_file(filepath)
+  filepath = vim.fn.fnamemodify(filepath, ':p')
+
+  if filepath:match '/slides%.md$' then
+    return vim.fn.fnamemodify(filepath, ':h')
+  end
+
+  local dir = vim.fn.fnamemodify(filepath, ':h')
+  while dir and dir ~= '' do
+    if vim.fn.filereadable(dir .. '/slides.md') == 1 then
+      return dir
+    end
+
+    local parent = vim.fn.fnamemodify(dir, ':h')
+    if parent == dir then
+      break
+    end
+    dir = parent
+  end
+
+  -- Fallback to the original pages/*.md assumption.
+  return vim.fn.fnamemodify(filepath, ':h:h')
+end
+
 local function close_tcp_client()
   if tcp_client then
     if not tcp_client:is_closing() then
@@ -156,12 +191,44 @@ end
 -- Returns array of {line = L, path = "relative/path.md"}
 local function extract_src_directives(lines)
   local directives = {}
-  for i, line in ipairs(lines) do
-    local src_path = line:match '^%s*src%s*:%s*(.+)%s*$'
-    if src_path then
-      table.insert(directives, { line = i, path = src_path })
-    end
+  local in_code_fence = false
+  local i = 1
+  local n = #lines
+
+  local function is_separator(line)
+    return line:match '^%s*%-%-%-%s*$' ~= nil
   end
+
+  local function is_code_fence(line)
+    return line:match '^%s*```' ~= nil
+  end
+
+  while i <= n do
+    local line = lines[i]
+
+    if is_code_fence(line) then
+      in_code_fence = not in_code_fence
+    elseif not in_code_fence and is_separator(line) then
+      local j = i + 1
+      local found_src = false
+      while j <= n and not is_separator(lines[j]) do
+        local src_path = not found_src and lines[j]:match '^%s*src%s*:%s*(.+)%s*$'
+        if src_path then
+          table.insert(directives, { line = j, path = src_path })
+          found_src = true
+        end
+
+        j = j + 1
+      end
+
+      if j <= n then
+        i = j
+      end
+    end
+
+    i = i + 1
+  end
+
   return directives
 end
 
@@ -178,6 +245,104 @@ local function count_slides_in_file(filepath)
   local lines = vim.split(content, '\n')
   local slides = parse_slides_from_lines(lines)
   return #slides
+end
+
+local function read_file_lines(filepath)
+  local f = io.open(filepath, 'r')
+  if not f then
+    return nil
+  end
+
+  local content = f:read '*all'
+  f:close()
+  return vim.split(content, '\n')
+end
+
+local function build_deck_index(deck_dir)
+  deck_dir = vim.fn.fnamemodify(deck_dir, ':p'):gsub('/$', '')
+
+  local main_file = deck_dir .. '/slides.md'
+  local main_lines = read_file_lines(main_file)
+  local index = {
+    deck_dir = deck_dir,
+    main_file = main_file,
+    slides = {},
+    by_slide = {},
+    by_file = {},
+  }
+
+  if not main_lines then
+    return index
+  end
+
+  local function add_slide(filepath, slide_num, line)
+    local entry = { slide = slide_num, file = filepath, line = line }
+    table.insert(index.slides, entry)
+    index.by_slide[slide_num] = entry
+
+    if not index.by_file[filepath] then
+      index.by_file[filepath] = {}
+    end
+    table.insert(index.by_file[filepath], entry)
+  end
+
+  local main_slides = parse_slides_from_lines(main_lines, true)
+  local directives = extract_src_directives(main_lines)
+
+  local function directive_path(directive)
+    return vim.fn.fnamemodify(deck_dir .. '/' .. directive.path, ':p')
+  end
+
+  local function external_slide_offset_before_line(line)
+    local offset = 0
+
+    for _, directive in ipairs(directives) do
+      if directive.line < line then
+        offset = offset + count_slides_in_file(directive_path(directive))
+      end
+    end
+
+    return offset
+  end
+
+  local function global_slide_offset_before_line(line)
+    local offset = external_slide_offset_before_line(line)
+
+    for _, slide_info in ipairs(main_slides) do
+      if slide_info.line < line then
+        offset = offset + 1
+      end
+    end
+
+    return offset
+  end
+
+  for _, slide_info in ipairs(main_slides) do
+    add_slide(main_file, slide_info.slide + external_slide_offset_before_line(slide_info.line), slide_info.line)
+  end
+
+  for _, directive in ipairs(directives) do
+    local filepath = directive_path(directive)
+    local lines = read_file_lines(filepath)
+    if lines then
+      local offset = global_slide_offset_before_line(directive.line)
+      for _, slide_info in ipairs(parse_slides_from_lines(lines)) do
+        add_slide(filepath, slide_info.slide + offset, slide_info.line)
+      end
+    end
+  end
+
+  table.sort(index.slides, function(a, b)
+    return a.slide < b.slide
+  end)
+
+  for _, slides in pairs(index.by_file) do
+    table.sort(slides, function(a, b)
+      return a.slide < b.slide
+    end)
+  end
+
+  return index
 end
 
 -- Detect slides in current buffer with global numbering
@@ -220,8 +385,8 @@ local function detect_slides()
 
     return slides
   else
-    -- pages/*.md: calculate offset from main slides.md
-    local slides_dir = vim.fn.fnamemodify(current_file, ':h:h') -- Go up from pages/ to slides/
+    -- Imported page: calculate offset from main slides.md
+    local slides_dir = deck_dir_for_file(current_file)
     local main_file = slides_dir .. '/slides.md'
     local offset = 0
 
@@ -300,23 +465,36 @@ local function goto_slide(slide_num)
     return false
   end
 
-  return vim.api.nvim_win_call(winid, function()
+  local source_file = vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(winid))
+  if source_file == '' then
+    return false
+  end
+
+  local deck_index = build_deck_index(deck_dir_for_file(source_file))
+  local target = deck_index.by_slide[slide_num]
+  if not target then
+    return false
+  end
+
+  local target_winid = find_window_for_file(target.file) or winid
+
+  return vim.api.nvim_win_call(target_winid, function()
     remember_slide_window()
 
-    if not slide_cache then
-      slide_cache = detect_slides()
-    end
-
-    for _, entry in ipairs(slide_cache) do
-      if entry.slide == slide_num then
-        local line = math.min(entry.line, vim.api.nvim_buf_line_count(0))
-        vim.api.nvim_win_set_cursor(0, { line, 0 })
-        vim.cmd 'normal! zz' -- Center screen
-        return true
+    if vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ':p') ~= target.file then
+      local ok = pcall(vim.cmd, 'silent keepalt edit ' .. vim.fn.fnameescape(target.file))
+      if not ok then
+        vim.notify('Slidevim: could not open slide source ' .. target.file, vim.log.levels.WARN)
+        return false
       end
     end
 
-    return false
+    local line = math.max(1, math.min(target.line, vim.api.nvim_buf_line_count(0)))
+    vim.api.nvim_win_set_cursor(0, { line, 0 })
+    vim.cmd 'normal! zz' -- Center screen
+    slide_cache = nil
+
+    return true
   end)
 end
 
@@ -610,6 +788,7 @@ M._debug = {
   parse_slides_from_lines = parse_slides_from_lines,
   extract_src_directives = extract_src_directives,
   count_slides_in_file = count_slides_in_file,
+  build_deck_index = build_deck_index,
   detect_slides = detect_slides,
 }
 
