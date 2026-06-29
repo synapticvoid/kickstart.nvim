@@ -14,6 +14,7 @@ M.config = {
 -- State
 local server_job = nil
 local tcp_client = nil
+local tcp_recv_buffer = ''
 local slide_cache = nil
 local debounce_timer = nil
 local autosave_timer = nil
@@ -49,6 +50,17 @@ local function find_slide_window()
       return winid
     end
   end
+end
+
+local function close_tcp_client()
+  if tcp_client then
+    if not tcp_client:is_closing() then
+      tcp_client:close()
+    end
+    tcp_client = nil
+  end
+
+  tcp_recv_buffer = ''
 end
 
 -- Parse markdown lines and return slide positions
@@ -345,18 +357,67 @@ local function schedule_slide_update()
   debounce_timer:start(M.config.debounce_ms, 0, vim.schedule_wrap(send_current_slide))
 end
 
+local function handle_server_message(line)
+  local ok, msg = pcall(vim.fn.json_decode, line)
+  if ok and msg.type == 'navigate' and msg.slide then
+    -- Ignore if this is the slide we just sent (echo suppression)
+    if msg.slide ~= last_sent_slide then
+      local success = goto_slide(msg.slide)
+      if success then
+        last_sent_slide = msg.slide
+        vim.notify('Slidevim: ← slide ' .. msg.slide, vim.log.levels.INFO)
+      end
+    end
+  end
+end
+
+local function handle_server_chunk(chunk)
+  tcp_recv_buffer = tcp_recv_buffer .. chunk
+
+  while true do
+    local newline = tcp_recv_buffer:find('\n', 1, true)
+    if not newline then
+      break
+    end
+
+    local line = tcp_recv_buffer:sub(1, newline - 1)
+    tcp_recv_buffer = tcp_recv_buffer:sub(newline + 1)
+
+    if line ~= '' then
+      handle_server_message(line)
+    end
+  end
+end
+
 -- Connect to Python server as TCP client
-local function connect_tcp()
+local function connect_tcp(attempt)
+  if not server_job then
+    return
+  end
+
+  attempt = attempt or 1
   local uv = vim.loop
   tcp_client = uv.new_tcp()
 
   tcp_client:connect(M.config.host, M.config.nvim_port, function(err)
     if err then
-      vim.schedule(function()
-        vim.notify('Slidevim: Failed to connect to server: ' .. err, vim.log.levels.ERROR)
-      end)
+      close_tcp_client()
+
+      if server_job and attempt < 20 then
+        vim.defer_fn(function()
+          if server_job then
+            connect_tcp(attempt + 1)
+          end
+        end, 250)
+      else
+        vim.schedule(function()
+          vim.notify('Slidevim: Failed to connect to server: ' .. err, vim.log.levels.ERROR)
+        end)
+      end
       return
     end
+
+    tcp_recv_buffer = ''
 
     vim.schedule(function()
       vim.notify('Slidevim: Connected to server', vim.log.levels.INFO)
@@ -373,39 +434,34 @@ local function connect_tcp()
 
       if not chunk then
         -- Connection closed
-        tcp_client:close()
-        tcp_client = nil
+        close_tcp_client()
         return
       end
 
       -- Handle incoming message (Chrome → Neovim)
       vim.schedule(function()
-        local ok, msg = pcall(vim.fn.json_decode, chunk)
-        if ok and msg.type == 'navigate' and msg.slide then
-          -- Ignore if this is the slide we just sent (echo suppression)
-          if msg.slide ~= last_sent_slide then
-            local success = goto_slide(msg.slide)
-            if success then
-              last_sent_slide = msg.slide
-              vim.notify('Slidevim: ← slide ' .. msg.slide, vim.log.levels.INFO)
-            end
-          end
-        end
+        handle_server_chunk(chunk)
       end)
     end)
   end)
 end
 
--- Autosave current buffer
-local function autosave_buffer()
-  if vim.bo.modified then
-    vim.cmd 'silent! update'
+-- Autosave a slides buffer
+local function autosave_buffer(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) or not is_slides_buffer(bufnr) then
+    return
   end
+
+  vim.api.nvim_buf_call(bufnr, function()
+    if vim.bo.modified then
+      vim.cmd 'silent! update'
+    end
+  end)
 end
 
 -- Debounced autosave
-local function schedule_autosave()
-  if not M.config.autosave then
+local function schedule_autosave(bufnr)
+  if not M.config.autosave or not is_slides_buffer(bufnr) then
     return
   end
 
@@ -414,7 +470,9 @@ local function schedule_autosave()
   end
 
   autosave_timer = vim.loop.new_timer()
-  autosave_timer:start(M.config.debounce_ms, 0, vim.schedule_wrap(autosave_buffer))
+  autosave_timer:start(M.config.debounce_ms, 0, vim.schedule_wrap(function()
+    autosave_buffer(bufnr)
+  end))
 end
 
 -- Start Python WebSocket server with uv
@@ -454,10 +512,7 @@ function M.start()
     end,
     on_exit = function(_, code)
       server_job = nil
-      if tcp_client then
-        tcp_client:close()
-        tcp_client = nil
-      end
+      close_tcp_client()
       if code ~= 0 then
         vim.notify('Slidevim: Server exited with code ' .. code, vim.log.levels.ERROR)
       end
@@ -466,7 +521,9 @@ function M.start()
 
   -- Give server a moment to start, then connect
   vim.defer_fn(function()
-    connect_tcp()
+    if server_job then
+      connect_tcp()
+    end
   end, 500)
 
   -- Set up autocommands
@@ -481,10 +538,14 @@ function M.start()
   vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI', 'BufEnter' }, {
     group = group,
     pattern = '*.md',
-    callback = function()
+    callback = function(args)
+      if not is_slides_buffer(args.buf) then
+        return
+      end
+
       remember_slide_window()
       slide_cache = nil -- Invalidate cache
-      schedule_autosave()
+      schedule_autosave(args.buf)
     end,
   })
 end
@@ -496,10 +557,7 @@ function M.stop()
     server_job = nil
   end
 
-  if tcp_client then
-    tcp_client:close()
-    tcp_client = nil
-  end
+  close_tcp_client()
 
   if debounce_timer then
     debounce_timer:stop()
@@ -515,7 +573,7 @@ function M.stop()
   last_slide_winid = nil
   last_sent_slide = nil
 
-  vim.api.nvim_del_augroup_by_name 'Slidevim'
+  pcall(vim.api.nvim_del_augroup_by_name, 'Slidevim')
   vim.notify('Slidevim: Stopped', vim.log.levels.INFO)
 end
 
